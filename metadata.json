@@ -1,0 +1,6 @@
+{
+  "name": "Novel Editor",
+  "description": "A polished and responsive writer suite featuring multi-pane layouts, paragraph formatting, line comparison, fixed text segments, and search & replace.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
