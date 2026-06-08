@@ -1,20 +1,33 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# 小说编辑器
 
-# Run and deploy your AI Studio app
+专业的桌面小说创作工具。
 
-This contains everything you need to run your app locally.
+## 安装
 
-View your app in AI Studio: https://ai.studio/apps/f1517e59-83ac-4427-8373-9ac340738b74
+打包后的安装程序位于 `release` 目录：
+- `小说编辑器 Setup 1.0.0.exe` - 安装程序
+- `win-unpacked\小说编辑器.exe` - 直接运行版本
 
-## Run Locally
+## 开发
 
-**Prerequisites:**  Node.js
+```bash
+# 安装依赖
+npm install
 
+# 开发模式
+npm run dev
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+# 构建
+npm run build
+
+# 打包为 Windows 应用
+npm run electron:build:win
+```
+
+## 技术栈
+
+React + Vite + Electron + TypeScript + Tailwind CSS
+
+## 许可证
+
+Apache-2.0
