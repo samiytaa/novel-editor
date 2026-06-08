@@ -5,6 +5,8 @@
 
 import {
   AlignLeft,
+  ArrowLeft,
+  ArrowRight,
   Check,
   ArrowDown,
   ArrowUp,
@@ -42,7 +44,7 @@ import {
 } from './types';
 
 import { FONT_FAMILIES, FONT_MAX, FONT_MIN, FONT_STEP, INITIAL_FIXED_TEXTS, SNIPPET_KEY, STORAGE_KEY } from './utils/constants';
-import { inlineDiff, lcsDiff } from './utils/diff';
+import { computeDiffLines, type DiffLine } from './utils/diff';
 
 export default function App() {
   // --- Persistent States ---
@@ -54,7 +56,7 @@ export default function App() {
         if (data.layout) return data.layout;
       }
     } catch (e) { }
-    return 'single';
+    return 'dual';
   });
 
   const [fontSize, setFontSize] = useState<number>(() => {
@@ -701,6 +703,7 @@ export default function App() {
     const nextVal = currentVal + separator + text;
 
     commitPaneValue(lastActivePaneIdx, nextVal);
+    setFixedOpen(false);
 
     setTimeout(() => {
       el.selectionStart = el.selectionEnd = nextVal.length;
@@ -891,48 +894,12 @@ export default function App() {
   };
 
   // Build reactive list of diff elements
-  const { left: diffLeftLines, right: diffRightLines } = getDiffLines();
+  const diffLines = getDiffLines();
 
-  function getDiffLines() {
+  function getDiffLines(): DiffLine[] {
     const textA = panes[0].content;
     const textB = panes[1].content;
-    const linesA = textA.split('\n');
-    const linesB = textB.split('\n');
-    const lineDiffResult = lcsDiff(linesA, linesB);
-
-    const fLeft: { html: string; cls: string }[] = [];
-    const fRight: { html: string; cls: string }[] = [];
-
-    let k = 0;
-    while (k < lineDiffResult.length) {
-      const cur = lineDiffResult[k];
-      const next = lineDiffResult[k + 1];
-
-      if (cur.type === 'del' && next && next.type === 'add') {
-        const rawA = cur.a || '';
-        const rawB = next.b || '';
-        const { htmlA, htmlB } = inlineDiff(rawA, rawB);
-        fLeft.push({ html: htmlA || '&nbsp;', cls: 'diff-del' });
-        fRight.push({ html: htmlB || '&nbsp;', cls: 'diff-add' });
-        k += 2;
-      } else if (cur.type === 'eq') {
-        const escVal = (cur.a || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        fLeft.push({ html: escVal || '&nbsp;', cls: 'diff-eq' });
-        fRight.push({ html: escVal || '&nbsp;', cls: 'diff-eq' });
-        k++;
-      } else if (cur.type === 'del') {
-        const escVal = (cur.a || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        fLeft.push({ html: escVal || '&nbsp;', cls: 'diff-del' });
-        fRight.push({ html: '&nbsp;', cls: 'diff-placeholder' });
-        k++;
-      } else {
-        const escVal = (cur.b || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        fLeft.push({ html: '&nbsp;', cls: 'diff-placeholder' });
-        fRight.push({ html: escVal || '&nbsp;', cls: 'diff-add' });
-        k++;
-      }
-    }
-    return { left: fLeft, right: fRight };
+    return computeDiffLines(textA, textB);
   }
 
   // --- Layout configurations ---
@@ -1157,7 +1124,7 @@ export default function App() {
       {/* TOAST PANEL */}
       <div
         id="toast"
-        className={`toast fixed bottom-6 left-1/2 -translate-x-1/2 text-sm bg-[var(--toolbar-bg)] text-[var(--toolbar-text)] px-5 py-2.5 rounded-full shadow-lg border border-white/10 tracking-wider z-50 pointer-events-none transition-all duration-300 ${toastShow ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+        className={`toast fixed bottom-6 left-1/2 -translate-x-1/2 text-sm bg-[var(--toolbar-bg)] text-[var(--toolbar-text)] px-5 py-2.5 rounded-full shadow-lg border border-white/10 tracking-wider z-[200] pointer-events-none transition-all duration-300 ${toastShow ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
           }`}
       >
         {toastText}
@@ -1262,7 +1229,7 @@ export default function App() {
             className="fixed inset-0 bg-[rgba(244,244,241,0.82)] backdrop-blur-[2px] z-45"
             onClick={() => setDiffOpen(false)}
           />
-          <div className="modal diff-modal fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-[1080px] h-[80vh] bg-[var(--surface)] border border-[var(--border)] shadow-2xl rounded-xl z-50 overflow-hidden flex flex-col">
+          <div className="modal diff-modal fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-[1200px] h-[85vh] bg-[var(--surface)] border border-[var(--border)] shadow-2xl rounded-xl z-50 overflow-hidden flex flex-col">
             <div className="modal-header flex items-center justify-between px-6 h-12 bg-[var(--surface-soft)] border-b border-[var(--border)]">
               <div className="flex items-center gap-2">
                 <Scale className="w-4 h-4 text-[var(--accent)]" />
@@ -1275,6 +1242,7 @@ export default function App() {
               </button>
             </div>
             <div className="diff-body flex flex-1 overflow-hidden">
+              {/* Left Side */}
               <div className="diff-col flex-1 flex flex-col overflow-hidden">
                 <div className="diff-col-title px-5 py-2 text-xs font-serif text-[var(--text-muted)] font-bold bg-[var(--surface-soft)] border-b border-[var(--border)]">
                   栏一内容
@@ -1282,20 +1250,43 @@ export default function App() {
                 <div
                   ref={leftScrollRef}
                   onScroll={handleLeftScroll}
-                  className="diff-content flex-1 overflow-y-auto px-6 py-5 font-serif text-sm leading-relaxed whitespace-pre-wrap select-text selection:bg-[var(--accent-soft)]"
+                  className="diff-content flex-1 overflow-y-auto bg-[var(--bg)]"
                 >
-                  {diffLeftLines.map((line, idx) => (
-                    <span
+                  {diffLines.map((line, idx) => (
+                    <div
                       key={idx}
-                      className={`diff-line block px-1.5 py-0.5 rounded ${line.cls}`}
-                      dangerouslySetInnerHTML={{ __html: line.html }}
-                    />
+                      className={`diff-line-row flex hover:bg-[var(--surface-soft)] ${
+                        line.type === 'del' ? 'bg-red-50' :
+                        line.type === 'modify' ? 'bg-amber-50' :
+                        line.type === 'add' ? 'bg-transparent' :
+                        ''
+                      }`}
+                    >
+                      <div className="line-num w-12 flex-shrink-0 text-center py-1.5 text-xs text-[var(--text-muted)] select-none border-r border-[var(--border)] bg-[var(--surface-soft)]">
+                        {line.leftLineNum || ''}
+                      </div>
+                      <div className="line-content flex-1 px-4 py-1.5 font-serif text-sm leading-relaxed">
+                        {line.type === 'add' ? (
+                          <span className="text-transparent select-none">&nbsp;</span>
+                        ) : line.type === 'modify' && line.leftHtml ? (
+                          <span
+                            className="select-text"
+                            dangerouslySetInnerHTML={{ __html: line.leftHtml }}
+                          />
+                        ) : (
+                          <span className="select-text">
+                            {line.leftContent || '\u00A0'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
 
               <div className="diff-divider w-px bg-[var(--border)] self-stretch" />
 
+              {/* Right Side */}
               <div className="diff-col flex-1 flex flex-col overflow-hidden">
                 <div className="diff-col-title px-5 py-2 text-xs font-serif text-[var(--text-muted)] font-bold bg-[var(--surface-soft)] border-b border-[var(--border)]">
                   栏二内容
@@ -1303,14 +1294,36 @@ export default function App() {
                 <div
                   ref={rightScrollRef}
                   onScroll={handleRightScroll}
-                  className="diff-content flex-1 overflow-y-auto px-6 py-5 font-serif text-sm leading-relaxed whitespace-pre-wrap select-text selection:bg-[var(--accent-soft)]"
+                  className="diff-content flex-1 overflow-y-auto bg-[var(--bg)]"
                 >
-                  {diffRightLines.map((line, idx) => (
-                    <span
+                  {diffLines.map((line, idx) => (
+                    <div
                       key={idx}
-                      className={`diff-line block px-1.5 py-0.5 rounded ${line.cls}`}
-                      dangerouslySetInnerHTML={{ __html: line.html }}
-                    />
+                      className={`diff-line-row flex hover:bg-[var(--surface-soft)] ${
+                        line.type === 'add' ? 'bg-green-50' :
+                        line.type === 'modify' ? 'bg-amber-50' :
+                        line.type === 'del' ? 'bg-transparent' :
+                        ''
+                      }`}
+                    >
+                      <div className="line-num w-12 flex-shrink-0 text-center py-1.5 text-xs text-[var(--text-muted)] select-none border-r border-[var(--border)] bg-[var(--surface-soft)]">
+                        {line.rightLineNum || ''}
+                      </div>
+                      <div className="line-content flex-1 px-4 py-1.5 font-serif text-sm leading-relaxed">
+                        {line.type === 'del' ? (
+                          <span className="text-transparent select-none">&nbsp;</span>
+                        ) : line.type === 'modify' && line.rightHtml ? (
+                          <span
+                            className="select-text"
+                            dangerouslySetInnerHTML={{ __html: line.rightHtml }}
+                          />
+                        ) : (
+                          <span className="select-text">
+                            {line.rightContent || '\u00A0'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -1689,7 +1702,7 @@ export default function App() {
                 : 'hover:bg-[var(--surface-soft)] text-[var(--text)] hover:text-[var(--accent)]'
               } cursor-pointer`}
           >
-            <span className="flex items-center gap-2"><Scissors className="w-3.5 h-3.5" />删除光标前文本</span>
+            <span className="flex items-center gap-2"><ArrowLeft className="w-3.5 h-3.5" />删除光标前文本</span>
           </li>
           <li
             id="ctx-delete-after"
@@ -1702,7 +1715,7 @@ export default function App() {
                 : 'hover:bg-[var(--surface-soft)] text-[var(--text)] hover:text-[var(--accent)]'
               } cursor-pointer`}
           >
-            <span className="flex items-center gap-2"><Eraser className="w-3.5 h-3.5" />删除光标后文本</span>
+            <span className="flex items-center gap-2"><ArrowRight className="w-3.5 h-3.5" />删除光标后文本</span>
           </li>
           <li className="ctx-divider h-px bg-[var(--border)] my-1 mx-2" />
           <li
